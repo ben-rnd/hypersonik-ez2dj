@@ -40,6 +40,8 @@ struct ds_buffer {
     bool buf_owned;
     bool playing;
     bool looping;
+    LONG volume;
+    LONG pan;
 };
 
 static bool ds_buffer_requires_conversion(const struct ds_buffer *self);
@@ -465,9 +467,16 @@ static __stdcall HRESULT ds_buffer_get_pan(
         IDirectSoundBuffer *com,
         LONG *out)
 {
-    trace("%s(%p) [stub]", __func__, out);
+    struct ds_buffer *self;
 
-    return E_NOTIMPL;
+    if (out == NULL) {
+        return E_POINTER;
+    }
+
+    self = ds_buffer_downcast(com);
+    *out = self->pan;
+
+    return S_OK;
 }
 
 static __stdcall HRESULT ds_buffer_get_status(
@@ -508,9 +517,16 @@ static __stdcall HRESULT ds_buffer_get_volume(
         IDirectSoundBuffer *com,
         LONG *out)
 {
-    trace("%s(%p)", __func__, out);
+    struct ds_buffer *self;
 
-    return E_NOTIMPL;
+    if (out == NULL) {
+        return E_POINTER;
+    }
+
+    self = ds_buffer_downcast(com);
+    *out = self->volume;
+
+    return S_OK;
 }
 
 static __stdcall HRESULT ds_buffer_initialize(
@@ -693,13 +709,48 @@ static __stdcall HRESULT ds_buffer_set_frequency(
     return S_OK;
 }
 
+static HRESULT ds_buffer_apply_volume(struct ds_buffer *self)
+{
+    struct snd_command *cmd;
+    int16_t left_vol;
+    int16_t right_vol;
+    LONG left_mb;
+    LONG right_mb;
+    int r;
+
+    left_mb = self->volume - (self->pan > 0 ? self->pan : 0);
+    right_mb = self->volume + (self->pan < 0 ? self->pan : 0);
+
+    left_vol = 256.0 * pow(10.0, left_mb / 2000.0);
+    right_vol = 256.0 * pow(10.0, right_mb / 2000.0);
+
+    r = snd_client_cmd_alloc(self->cli, &cmd);
+
+    if (r < 0) {
+        return hr_from_errno(r);
+    }
+
+    snd_command_set_volume(cmd, self->stm, 0, left_vol);
+    snd_command_set_volume(cmd, self->stm, 1, right_vol);
+    snd_client_cmd_submit(self->cli, cmd);
+
+    return S_OK;
+}
+
 static __stdcall HRESULT ds_buffer_set_pan(
         IDirectSoundBuffer *com,
         LONG pan)
 {
-    // stub
+    struct ds_buffer *self;
 
-    return S_OK;
+    if (pan < -10000 || pan > 10000) {
+        return E_INVALIDARG;
+    }
+
+    self = ds_buffer_downcast(com);
+    self->pan = pan;
+
+    return ds_buffer_apply_volume(self);
 }
 
 static __stdcall HRESULT ds_buffer_set_volume(
@@ -707,9 +758,6 @@ static __stdcall HRESULT ds_buffer_set_volume(
         LONG millibels)
 {
     struct ds_buffer *self;
-    struct snd_command *cmd;
-    int16_t linear_vol;
-    int r;
 
     if (millibels < -10000 || millibels > 0) {
         trace("%s: Attenutation param out of range: %li", millibels);
@@ -718,19 +766,9 @@ static __stdcall HRESULT ds_buffer_set_volume(
     }
 
     self = ds_buffer_downcast(com);
-    linear_vol = 256.0 * pow(10.0, millibels / 2000.0);
+    self->volume = millibels;
 
-    r = snd_client_cmd_alloc(self->cli, &cmd);
-
-    if (r < 0) {
-        return hr_from_errno(r);
-    }
-
-    snd_command_set_volume(cmd, self->stm, 0, linear_vol);
-    snd_command_set_volume(cmd, self->stm, 1, linear_vol);
-    snd_client_cmd_submit(self->cli, cmd);
-
-    return S_OK;
+    return ds_buffer_apply_volume(self);
 }
 
 static __stdcall HRESULT ds_buffer_stop(IDirectSoundBuffer *com)
