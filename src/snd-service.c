@@ -132,7 +132,7 @@ void snd_command_set_volume(
         struct snd_command *cmd,
         struct snd_stream *stm,
         size_t channel_no,
-        uint8_t value)
+        uint16_t value)
 {
     assert(cmd != NULL);
 
