@@ -635,12 +635,15 @@ static __stdcall HRESULT ds_buffer_play(
     if (r < 0) {
         return hr_from_errno(r);
     }
-
-    self->playing = true;
+    
     self->looping = flags & DSBPLAY_LOOPING;
 
-    snd_command_play(cmd, self->stm, self->looping);
-    snd_client_cmd_submit(self->cli, cmd);
+    if (!self->playing) {
+        self->playing = true;
+        
+        snd_command_play(cmd, self->stm, self->looping);
+        snd_client_cmd_submit(self->cli, cmd);
+    }
 
     return S_OK;
 }
