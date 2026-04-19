@@ -431,9 +431,9 @@ static IDirectSound8Vtbl ds_api_vtbl = {
     .VerifyCertification    = ds_api_verify_certification,
 };
 
-/* DirectSound API entry point, exported as DirectSoundCreate8 */
+/* DirectSound8 API entry point, exported as DirectSoundCreate8 */
 
-HRESULT __stdcall ds_api_create(
+HRESULT __stdcall ds_api_create8(
         const GUID *guid_device,
         IDirectSound8 **out,
         IUnknown *outer)
@@ -478,4 +478,14 @@ end:
     ds_api_unref(api);
 
     return hr;
+}
+
+/* DirectSound API entry point, exported as DirectSoundCreate */
+
+HRESULT __stdcall ds_api_create(
+        const GUID *guid_device,
+        IDirectSound **out,
+        IUnknown *outer)
+{
+    return ds_api_create8(guid_device, (IDirectSound8 **) out, outer);
 }

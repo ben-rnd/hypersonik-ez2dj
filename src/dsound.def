@@ -1,4 +1,5 @@
 LIBRARY dsound
 
 EXPORTS
-    DirectSoundCreate8=ds_api_create@12 @11
+    DirectSoundCreate=ds_api_create@12 @1
+    DirectSoundCreate8=ds_api_create8@12 @11
