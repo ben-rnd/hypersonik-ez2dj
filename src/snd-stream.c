@@ -109,11 +109,13 @@ bool snd_stream_render(
 
         pos = pos_end;
 
+        if (pos >= buf_nsamples && stm->looping) {
+            pos = 0;
+        }
+
         if (dest_nsamples == 0 || !stm->looping) {
             break;
         }
-
-        pos = 0;
     }
 
     atomic_store(&stm->pos, pos);
